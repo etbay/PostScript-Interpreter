@@ -36,6 +36,7 @@
 #*.wwaproj   merge=binary
 
 *.shader linguist-detectable=false
+*.hlsl linguist-detectable=false
 
 ###############################################################################
 # behavior for image files
