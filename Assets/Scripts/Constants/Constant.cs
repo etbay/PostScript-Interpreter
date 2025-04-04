@@ -1,6 +1,6 @@
 using System;
 
-namespace Interpreter.Constants
+namespace PSInterpreter.Constants
 {
     public abstract class Constant
     {

@@ -1,11 +1,11 @@
-using Interpreter.Constants;
+using PSInterpreter.Constants;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Net.NetworkInformation;
 
-namespace Interpreter
+namespace PSInterpreter
 {
     public static class Interpreter
     {

@@ -1,4 +1,4 @@
-namespace Interpreter.Constants
+namespace PSInterpreter.Constants
 {
     public class FloatConstant : Constant
     {
