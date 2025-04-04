@@ -2,7 +2,7 @@ namespace PSInterpreter.Constants
 {
     public class BooleanConstant : Constant
     {
-        public static bool Value { get; set; }
+        public bool Value { get; set; }
 
         public BooleanConstant(bool value)
         {

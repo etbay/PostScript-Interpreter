@@ -34,6 +34,7 @@ public class Console : MonoBehaviour
         if (!string.IsNullOrEmpty(input))
         {
             textField.text += input + "\n";
+            Interpreter.ProcessInput(input);
             StartCoroutine(WaitAndPrompt());
         }
         else

@@ -29,6 +29,7 @@ namespace PSInterpreter
         {
             try
             {
+                Debug.WriteLine("processing " + input);
                 ProcessConstants(input);
             }
             catch
@@ -95,11 +96,11 @@ namespace PSInterpreter
         {
             Debug.WriteLine("Attempting to parse " + input + " into numeric");
 
-            if (float.TryParse(input, out float floatResult) && int.TryParse(input, out int intResult))
+            if (float.TryParse(input, out float floatResult))
             {
-                if (floatResult == (float)intResult)
+                if (floatResult == (float)(int)floatResult)
                 {
-                    return new IntegerConstant(intResult);
+                    return new IntegerConstant((int)floatResult);
                 }
                 else
                 {

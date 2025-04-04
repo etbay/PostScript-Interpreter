@@ -2,7 +2,7 @@ namespace PSInterpreter.Constants
 {
     public class FloatConstant : Constant
     {
-        public static float Value { get; set; }
+        public float Value { get; set; }
 
         public FloatConstant(float value)
         {
