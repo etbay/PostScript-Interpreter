@@ -35,6 +35,8 @@
 #*.sqlproj   merge=binary
 #*.wwaproj   merge=binary
 
+*.vs linguist-detectable=false
+
 ###############################################################################
 # behavior for image files
 #
