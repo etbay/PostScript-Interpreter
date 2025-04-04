@@ -50,6 +50,23 @@ namespace PSInterpreter
             return opStack.Count;
         }
 
+        public static Constant PeekStack()
+        {
+            return opStack.Peek();
+        }
+
+        public static void Reset()
+        {
+            opStack.Clear();
+            dictStack.Clear();
+            InitializeDict();
+        }
+
+        private static void InitializeDict()
+        {
+            //stuff
+        }
+
         private static void ProcessConstants(string input)
         {
             foreach (Parser parser in parsers)

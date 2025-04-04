@@ -6,30 +6,52 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
 using PSInterpreter;
+using static System.Net.Mime.MediaTypeNames;
 
 public class Console : MonoBehaviour
 {
     [SerializeField]
     private TMP_InputField textField;
+    private string lastText;
 
     // Start is called before the first frame update
     void Start()
     {
         SelectField();
         Prompt();
+
+        int len = textField.text.Length;
+
+        textField.caretPosition = len;
+        textField.selectionAnchorPosition = len;
+        textField.selectionFocusPosition = len;
     }
 
     public void OnValueChanged()
     {
-        if (this.isActiveAndEnabled)
+        string input = GetInput();
+
+        if (!string.IsNullOrEmpty(input))
         {
-            StartCoroutine(WaitForNewline());
+            textField.text += input + "\n";
+            StartCoroutine(WaitAndPrompt());
+        }
+        else
+        {
+            SelectField();
         }
     }
 
-    private IEnumerator WaitForNewline()
+    private string GetInput()
     {
-        yield return new WaitForSeconds(0.1f);
+        string input = textField.text.Substring(lastText.Length);
+        lastText = textField.text;
+        return input.Trim();
+    }
+
+    private IEnumerator WaitAndPrompt()
+    {
+        yield return new WaitForSeconds(0.01f);
         SelectField();
         Prompt();
     }
@@ -43,6 +65,7 @@ public class Console : MonoBehaviour
     private void Prompt()
     {
         textField.text += "REPL(" + Interpreter.StackCount() + ")> ";
+        lastText = textField.text;
         textField.stringPosition = textField.text.Length;
     }
 }
