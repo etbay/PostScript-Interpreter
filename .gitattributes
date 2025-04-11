@@ -35,6 +35,10 @@
 #*.sqlproj   merge=binary
 #*.wwaproj   merge=binary
 
+*.shader linguist-detectable=false
+*.hlsl linguist-detectable=false
+*.cginc linguist-detectable=false
+
 ###############################################################################
 # behavior for image files
 #
