@@ -2,20 +2,21 @@ using PSInterpreter.Constants;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Net.NetworkInformation;
+using Unity.VisualScripting;
 
 namespace PSInterpreter
 {
+    public delegate void Operation();
     public static class Interpreter
     {
         public delegate Constant Parser(string input);
 
-        public delegate void Operation();
-
         private static Stack<Constant> opStack = new Stack<Constant>();
 
-        private static Stack<Dictionary<string, Constant>> dictStack = new Stack<Dictionary<string, Constant>>();
+        private static List<Dictionary<string, Constant>> dictStack = new List<Dictionary<string, Constant>>();
 
         private static List<Parser> parsers = new List<Parser>();
 
@@ -63,9 +64,17 @@ namespace PSInterpreter
             InitializeDict();
         }
 
+
         private static void InitializeDict()
         {
-            //stuff
+            dictStack.Add(new Dictionary<string, Constant>());
+            // adds operations to first (and only) dictionary
+            dictStack[0]["add"] = new OperationConstant(Add);
+        }
+
+        private static void Add()
+        {
+
         }
 
         private static void ProcessConstants(string input)
@@ -80,17 +89,24 @@ namespace PSInterpreter
                 }
                 catch
                 {
+                    LookupInDict(input);
                     continue;
                 }
             }
         }
 
-        private static void LookupInDict(string input)
+        private static Constant LookupInDict(string input)
         {
+            for (int i = dictStack.Count; i > 0; i--)
+            {
+                foreach (KeyValuePair<string, Constant> values in dictStack[i])
+                {
 
+                }
+            }
         }
 
-        // may create a factory later for parsers
+        // may create a factory later for Constant types
 
         private static Constant ProcessNumeric(string input)
         {

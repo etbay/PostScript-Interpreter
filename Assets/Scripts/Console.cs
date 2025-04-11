@@ -31,15 +31,17 @@ public class Console : MonoBehaviour
     {
         string input = GetInput();
 
-        if (!string.IsNullOrEmpty(input))
+        Interpreter.ProcessInput(input);
+        StartCoroutine(WaitAndPrompt());
+    }
+
+    public void OnDeselected()
+    {
+        string input = GetInput();
+
+        if (input == string.Empty)
         {
-            textField.text += input + "\n";
-            Interpreter.ProcessInput(input);
-            StartCoroutine(WaitAndPrompt());
-        }
-        else
-        {
-            SelectField();
+            textField.text += "\n";
         }
     }
 
@@ -47,9 +49,10 @@ public class Console : MonoBehaviour
     {
         string input = textField.text.Substring(lastText.Length);
         lastText = textField.text;
-        return input.Trim();
+        return input;
     }
 
+    // Waits for textField to add newline before displaying
     private IEnumerator WaitAndPrompt()
     {
         yield return new WaitForSeconds(0.01f);
