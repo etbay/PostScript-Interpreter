@@ -1,5 +1,7 @@
 namespace PSInterpreter.Constants
 {
+    public delegate void Operation();
+
     public class OperationConstant : Constant
     {
         public Operation Value { get; set; }
