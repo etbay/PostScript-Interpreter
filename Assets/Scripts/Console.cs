@@ -102,12 +102,17 @@ public class Console : MonoBehaviour
     /// <returns></returns>
     private string GetInput()
     {
-        string input = textField.text.Substring(lastText.Length);
-        UpdateLastText();
+        if (textField.text.Length >= lastText.Length)
+        {
+            string input = textField.text.Substring(lastText.Length);
+            UpdateLastText();
 
-        Debug.Log($"Input was: '{input}'");
+            Debug.Log($"Input was: '{input}'");
 
-        return input;
+            return input;
+        }
+
+        return string.Empty;
     }
 
     private void DisplayToConsole(string output)

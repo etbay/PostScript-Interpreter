@@ -38,12 +38,21 @@ namespace PSInterpreter
             dictStack.Add(new Dictionary<string, Constant>());
 
             // initializes the system dictionary with operators
+            dictStack[0]["exch"] = new OperationConstant(ExchangeOperation);
+            dictStack[0]["pop"] = new OperationConstant(PopOperation);
+            dictStack[0]["copy"] = new OperationConstant(CopyOperation);
+            dictStack[0]["dup"] = new OperationConstant(DuplicateOperation);
+            dictStack[0]["clear"] = new OperationConstant(ClearOperation);
+            dictStack[0]["count"] = new OperationConstant(CountOperation);
+
             dictStack[0]["add"] = new OperationConstant(AdditionOperation);
             dictStack[0]["sub"] = new OperationConstant(SubtractionOperation);
             dictStack[0]["mul"] = new OperationConstant(MultiplicationOperation);
             dictStack[0]["div"] = new OperationConstant(DivisionOperation);
             dictStack[0]["mod"] = new OperationConstant(ModularDivisionOperation);
-            dictStack[0]["="] = new OperationConstant(PopAndDisplay);
+            dictStack[0]["idiv"] = new OperationConstant(IntegerDivisionOperation);
+
+            dictStack[0]["="] = new OperationConstant(PopAndDisplayOperation);
         }
 
         public static void Reset()
@@ -83,7 +92,7 @@ namespace PSInterpreter
                 }
                 catch (Exception ex)
                 {
-                    DisplayToConsole.Invoke(ex.Message);
+                    DisplayToConsole?.Invoke(ex.Message);
                 }
             }
         }
@@ -178,6 +187,122 @@ namespace PSInterpreter
             throw new Exception("Could not parse " + input + " into boolean");
         }
 
+        #region STACK_MANIPULATION_OPERATIONS
+
+        /// <summary>
+        /// Defines "exch" exchange top two elements operation.
+        /// </summary>
+        private static void ExchangeOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val1 = opStack.Pop();
+                Constant val2 = opStack.Pop();
+
+                opStack.Push(val1);
+                opStack.Push(val2);
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "pop" pop stack operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void PopOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                opStack.Pop();
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "copy" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void CopyOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                List<Constant> constantsCopied = new List<Constant>();
+                Constant numCopy = opStack.Pop();
+                if (numCopy is IntegerConstant integerConstant)
+                {
+                    // don't attempt to copy more than the stack
+                    int numToCopy = integerConstant.Value < StackCount() ? integerConstant.Value : StackCount();
+                    for (int i = 0; i < numToCopy; i++)
+                    {
+                        constantsCopied.Add(opStack.Pop());
+                    }
+
+                    constantsCopied.Reverse();
+
+                    // add constants back that were removed
+                    foreach (Constant constant in constantsCopied)
+                    {
+                        opStack.Push(constant);
+                    }
+
+                    // add copies to top of the stack
+                    foreach (Constant constant in constantsCopied)
+                    {
+                        opStack.Push(constant);
+                    }
+                }
+                else
+                {
+                    throw new Exception("Type is not supported in copy operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "dup" duplication operation
+        /// </summary>
+        private static void DuplicateOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                opStack.Push(opStack.Peek());
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "clear" operation.
+        /// </summary>
+        private static void ClearOperation()
+        {
+            opStack.Clear();
+        }
+
+        /// <summary>
+        /// Defines "count" operation.
+        /// </summary>
+        private static void CountOperation()
+        {
+            opStack.Push(new IntegerConstant(StackCount()));
+        }
+
+        #endregion
+
+        #region ARITHMETIC_OPERATIONS
+
         /// <summary>
         /// Defines "add" addition operation.
         /// </summary>
@@ -251,7 +376,7 @@ namespace PSInterpreter
                     default:
                         opStack.Push(val1);
                         opStack.Push(val2);
-                        throw new Exception("Type is not supported in add operation");
+                        throw new Exception("Type is not supported in sub operation");
                 }
             }
             else
@@ -292,7 +417,7 @@ namespace PSInterpreter
                     default:
                         opStack.Push(val1);
                         opStack.Push(val2);
-                        throw new Exception("Type is not supported in add operation");
+                        throw new Exception("Type is not supported in mul operation");
                 }
             }
             else
@@ -319,7 +444,16 @@ namespace PSInterpreter
                         break;
 
                     case (FloatConstant val1Float, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value / val2Int.Value)));
+                        if (val2Int.Value == 0)
+                        {
+                            opStack.Push(val1Float);
+                            opStack.Push(val2Int);
+                            throw new Exception("Cannot divide by zero");
+                        }
+                        else
+                        {
+                            opStack.Push(ProcessNumericFromFloat((val1Float.Value / val2Int.Value)));
+                        }
                         break;
 
                     case (IntegerConstant val1Int, FloatConstant val2Float):
@@ -327,13 +461,22 @@ namespace PSInterpreter
                         break;
 
                     case (IntegerConstant val1Int, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value / val2Int.Value)));
+                        if (val2Int.Value == 0)
+                        {
+                            opStack.Push(val1Int);
+                            opStack.Push(val2Int);
+                            throw new Exception("Cannot divide by zero");
+                        }
+                        else
+                        {
+                            opStack.Push(ProcessNumericFromFloat(((float)val1Int.Value / val2Int.Value)));
+                        }
                         break;
 
                     default:
                         opStack.Push(val1);
                         opStack.Push(val2);
-                        throw new Exception("Type is not supported in add operation");
+                        throw new Exception("Type is not supported in div operation");
                 }
             }
             else
@@ -362,7 +505,7 @@ namespace PSInterpreter
                     default:
                         opStack.Push(val1);
                         opStack.Push(val2);
-                        throw new Exception("Type is not supported in add operation");
+                        throw new Exception("Type is not supported in mod operation");
                 }
             }
             else
@@ -371,11 +514,38 @@ namespace PSInterpreter
             }
         }
 
+        private static void IntegerDivisionOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (IntegerConstant val1Int, IntegerConstant val2Int):
+                        opStack.Push(ProcessNumericFromFloat((int)(val1Int.Value / val2Int.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception("Type is not supported in idiv operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Defines "=" pop and display operation.
         /// </summary>
         /// <exception cref="Exception"></exception>
-        private static void PopAndDisplay()
+        private static void PopAndDisplayOperation()
         {
             if (StackCount() >= 1)
             {
@@ -389,6 +559,10 @@ namespace PSInterpreter
                     DisplayToConsole(fc.Value.ToString());
                 else
                     throw new Exception("Unable to display constant type");
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
             }
         }
     }
