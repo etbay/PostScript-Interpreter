@@ -26,10 +26,10 @@ public class ConstantTests
     [Test]
     public void FloatConstantTest()
     {
-        Interpreter.ProcessInput("4.6");
+        Interpreter.ProcessInput("4.0");
         Assert.That(Interpreter.PeekStack(), Is.TypeOf<FloatConstant>());
         FloatConstant fc = (FloatConstant)Interpreter.PeekStack();
-        Assert.That(fc.Value, Is.EqualTo(4.6f));
+        Assert.That(fc.Value, Is.EqualTo(4.0f));
     }
 
     [Test]

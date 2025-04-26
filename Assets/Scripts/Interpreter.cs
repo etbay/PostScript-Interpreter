@@ -8,6 +8,7 @@ namespace PSInterpreter
     using System.Net.NetworkInformation;
     using Unity.VisualScripting;
     using UnityEngine;
+    using UnityEngine.UIElements;
     using UnityEngine.Windows;
 
     public static class Interpreter
@@ -26,6 +27,7 @@ namespace PSInterpreter
         {
             parsers.Add(ProcessNumeric);
             parsers.Add(ProcessBoolean);
+            parsers.Add(ProcessString);
             InitializeDict();
         }
 
@@ -51,8 +53,29 @@ namespace PSInterpreter
             dictStack[0]["div"] = new OperationConstant(DivisionOperation);
             dictStack[0]["mod"] = new OperationConstant(ModularDivisionOperation);
             dictStack[0]["idiv"] = new OperationConstant(IntegerDivisionOperation);
+            dictStack[0]["abs"] = new OperationConstant(AbsoluteValueOperation);
+            dictStack[0]["neg"] = new OperationConstant(NegateOperation);
+            dictStack[0]["ceil"] = new OperationConstant(CeilingOperation);
+            dictStack[0]["floor"] = new OperationConstant(FloorOperation);
+            dictStack[0]["round"] = new OperationConstant(RoundOperation);
+            dictStack[0]["sqrt"] = new OperationConstant(SquareRootOperation);
 
+            dictStack[0]["length"] = new OperationConstant(LengthOperation);
+            dictStack[0]["get"] = new OperationConstant(GetOperation);
+            dictStack[0]["getinterval"] = new OperationConstant(GetIntervalOperation);
+            dictStack[0]["puinterval"] = new OperationConstant(PutIntervalOperation);
+
+            dictStack[0]["eq"] = new OperationConstant(EqualToOperation);
+            dictStack[0]["ne"] = new OperationConstant(NotEqualToOperation);
+            dictStack[0]["gt"] = new OperationConstant(GreaterThanOperation);
+            dictStack[0]["lt"] = new OperationConstant(LessThanOperation);
+            dictStack[0]["and"] = new OperationConstant(AndOperation);
+            dictStack[0]["or"] = new OperationConstant(OrOperation);
+            dictStack[0]["not"] = new OperationConstant(NotOperation);
+
+            dictStack[0]["print"] = new OperationConstant(PopAndDisplayOperation);
             dictStack[0]["="] = new OperationConstant(PopAndDisplayOperation);
+            dictStack[0]["=="] = new OperationConstant(PopAndDisplayOperation);
         }
 
         public static void Reset()
@@ -123,21 +146,25 @@ namespace PSInterpreter
 
         private static void LookupInDict(string input)
         {
-            Debug.Log("Looking up " + input + " in dictStack(" + dictStack.Count + ")");
+            Debug.Log($"Looking up '{input}' in dictStack({dictStack.Count})");
             foreach (Dictionary<string, Constant> dict in dictStack)
             {
                 foreach (KeyValuePair<string, Constant> variable in dict)
                 {
-                    Debug.Log("Key: " + variable.Key + ", Value: " + variable.Value);
+                    Debug.Log($"Key: {variable.Key}, Value: {variable.Value}");
                     if (input == variable.Key && variable.Value is OperationConstant)
                     {
-                        Debug.Log("Found " + input + " in dictStack. Executing");
+                        Debug.Log($"Found '{input}' in dictStack. Executing");
                         OperationConstant op = (OperationConstant) variable.Value;
                         op.Value();
+                        return;
                     }
                 }
+                throw new Exception($"Operation '{input}' not found");
             }
         }
+
+        #region PARSERS
 
         /// <summary>
         /// 
@@ -149,25 +176,21 @@ namespace PSInterpreter
         {
             Debug.Log($"Attempting to parse '{input}' into numeric");
 
-            if (float.TryParse(input, out float floatResult))
+            if (float.TryParse(input, out float floatResult) || int.TryParse(input, out int intResult))
             {
-                return ProcessNumericFromFloat(floatResult);
+
+                if (input.Contains('.'))
+                {
+                    Debug.Log($"Parsed '{input}' into float");
+                    return new FloatConstant(floatResult);
+                }
+                else
+                {
+                    Debug.Log($"Parsed '{input}' into integer");
+                    return new IntegerConstant((int)floatResult);
+                }
             }
             throw new Exception("Could not parse " + input + " into numeric");
-        }
-
-        private static Constant ProcessNumericFromFloat(float input)
-        {
-            if (input == (float)(int)input) // if float is actually an integer
-            {
-                Debug.Log($"Parsed '{input}' into integer");
-                return new IntegerConstant((int)input);
-            }
-            else
-            {
-                Debug.Log($"Parsed '{input}' into float");
-                return new FloatConstant(input);
-            }
         }
 
         private static Constant ProcessBoolean(string input)
@@ -186,6 +209,18 @@ namespace PSInterpreter
             }
             throw new Exception("Could not parse " + input + " into boolean");
         }
+
+        private static Constant ProcessString(string input)
+        {
+            if (input.StartsWith('(') && input.EndsWith(')'))
+            {
+                string inputString = input.Substring(1, input.Length - 2);
+                return new StringConstant(inputString);
+            }
+            throw new Exception("Could not parse " + input + " into string");
+        }
+
+        #endregion
 
         #region STACK_MANIPULATION_OPERATIONS
 
@@ -317,19 +352,19 @@ namespace PSInterpreter
                 switch ((val1, val2))
                 {
                     case (FloatConstant val1Float, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value + val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Float.Value + val2Float.Value)));
                         break;
 
                     case (FloatConstant val1Float, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value + val2Int.Value)));
+                        opStack.Push(new FloatConstant((val1Float.Value + val2Int.Value)));
                         break;
 
                     case (IntegerConstant val1Int, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value + val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Int.Value + val2Float.Value)));
                         break;
 
                     case (IntegerConstant val1Int, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value + val2Int.Value)));
+                        opStack.Push(new IntegerConstant((val1Int.Value + val2Int.Value)));
                         break;
 
                     default:
@@ -358,19 +393,19 @@ namespace PSInterpreter
                 switch ((val1, val2))
                 {
                     case (FloatConstant val1Float, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value - val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Float.Value - val2Float.Value)));
                         break;
 
                     case (FloatConstant val1Float, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value - val2Int.Value)));
+                        opStack.Push(new FloatConstant((val1Float.Value - val2Int.Value)));
                         break;
 
                     case (IntegerConstant val1Int, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value - val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Int.Value - val2Float.Value)));
                         break;
 
                     case (IntegerConstant val1Int, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value - val2Int.Value)));
+                        opStack.Push(new IntegerConstant((val1Int.Value - val2Int.Value)));
                         break;
 
                     default:
@@ -399,19 +434,19 @@ namespace PSInterpreter
                 switch ((val1, val2))
                 {
                     case (FloatConstant val1Float, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value * val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Float.Value * val2Float.Value)));
                         break;
 
                     case (FloatConstant val1Float, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value * val2Int.Value)));
+                        opStack.Push(new FloatConstant((val1Float.Value * val2Int.Value)));
                         break;
 
                     case (IntegerConstant val1Int, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value * val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Int.Value * val2Float.Value)));
                         break;
 
                     case (IntegerConstant val1Int, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value * val2Int.Value)));
+                        opStack.Push(new IntegerConstant((val1Int.Value * val2Int.Value)));
                         break;
 
                     default:
@@ -440,7 +475,7 @@ namespace PSInterpreter
                 switch ((val1, val2))
                 {
                     case (FloatConstant val1Float, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Float.Value / val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Float.Value / val2Float.Value)));
                         break;
 
                     case (FloatConstant val1Float, IntegerConstant val2Int):
@@ -452,12 +487,12 @@ namespace PSInterpreter
                         }
                         else
                         {
-                            opStack.Push(ProcessNumericFromFloat((val1Float.Value / val2Int.Value)));
+                            opStack.Push(new FloatConstant((val1Float.Value / val2Int.Value)));
                         }
                         break;
 
                     case (IntegerConstant val1Int, FloatConstant val2Float):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value / val2Float.Value)));
+                        opStack.Push(new FloatConstant((val1Int.Value / val2Float.Value)));
                         break;
 
                     case (IntegerConstant val1Int, IntegerConstant val2Int):
@@ -469,7 +504,7 @@ namespace PSInterpreter
                         }
                         else
                         {
-                            opStack.Push(ProcessNumericFromFloat(((float)val1Int.Value / val2Int.Value)));
+                            opStack.Push(new FloatConstant(((float)val1Int.Value / val2Int.Value)));
                         }
                         break;
 
@@ -499,7 +534,7 @@ namespace PSInterpreter
                 switch ((val1, val2))
                 {
                     case (IntegerConstant val1Int, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((val1Int.Value % val2Int.Value)));
+                        opStack.Push(new IntegerConstant((val1Int.Value % val2Int.Value)));
                         break;
 
                     default:
@@ -514,6 +549,10 @@ namespace PSInterpreter
             }
         }
 
+        /// <summary>
+        /// Defines "idiv" integer division operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         private static void IntegerDivisionOperation()
         {
             if (StackCount() >= 2)
@@ -524,7 +563,7 @@ namespace PSInterpreter
                 switch ((val1, val2))
                 {
                     case (IntegerConstant val1Int, IntegerConstant val2Int):
-                        opStack.Push(ProcessNumericFromFloat((int)(val1Int.Value / val2Int.Value)));
+                        opStack.Push(new IntegerConstant((int)(val1Int.Value / val2Int.Value)));
                         break;
 
                     default:
@@ -539,7 +578,586 @@ namespace PSInterpreter
             }
         }
 
+        /// <summary>
+        /// Defines "abs" absolute value operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void AbsoluteValueOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (IntegerConstant valInt):
+                        opStack.Push(new IntegerConstant(Math.Abs(valInt.Value)));
+                        break;
+
+                    case (FloatConstant valFloat):
+                        opStack.Push(new FloatConstant(Math.Abs(valFloat.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in abs operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "neg" negate operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void NegateOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (IntegerConstant valInt):
+                        opStack.Push(new IntegerConstant(-valInt.Value));
+                        break;
+
+                    case (FloatConstant valFloat):
+                        opStack.Push(new FloatConstant(-valFloat.Value));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in negate operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "ceiling" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void CeilingOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (IntegerConstant valInt):
+                        opStack.Push(valInt);
+                        break;
+
+                    case (FloatConstant valFloat):
+                        opStack.Push(new FloatConstant((float)Math.Ceiling(valFloat.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in ceiling operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "floor" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void FloorOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (IntegerConstant valInt):
+                        opStack.Push(valInt);
+                        break;
+
+                    case (FloatConstant valFloat):
+                        opStack.Push(new FloatConstant((float)Math.Floor(valFloat.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in floor operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "round" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void RoundOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (IntegerConstant valInt):
+                        opStack.Push(valInt);
+                        break;
+
+                    case (FloatConstant valFloat):
+                        opStack.Push(new FloatConstant((float)Math.Round(valFloat.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in round operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "sqrt" square root operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void SquareRootOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (IntegerConstant valInt):
+                        opStack.Push(new IntegerConstant((int)Math.Sqrt(valInt.Value)));
+                        break;
+
+                    case (FloatConstant valFloat):
+                        opStack.Push(new FloatConstant((float)Math.Sqrt(valFloat.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in square root operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
         #endregion
+
+        #region STRING_OPERATIONS
+
+        /// <summary>
+        /// Defines "length" string operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void LengthOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (StringConstant valString):
+                        opStack.Push(new IntegerConstant(valString.Value.Length));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception($"Unsupported type for length operation: {val.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "get" string operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void GetOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (StringConstant val1String, IntegerConstant val2Int):
+                        opStack.Push(new IntegerConstant(val1String.Value[val2Int.Value]));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for get operation: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "getinterval" string operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void GetIntervalOperation()
+        {
+            if (StackCount() >= 3)
+            {
+                Constant val3 = opStack.Pop();
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2, val3))
+                {
+                    case (StringConstant val1String, IntegerConstant val2Int, IntegerConstant val3Int):
+                        opStack.Push(new StringConstant(val1String.Value.Substring(val2Int.Value, val3Int.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        opStack.Push(val3);
+                        throw new Exception($"Unsupported types for getinterval operation: {val1.GetType()}, {val2.GetType()}, and {val3.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "putinterval" string operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void PutIntervalOperation()
+        {
+            if (StackCount() >= 3)
+            {
+                Constant val3 = opStack.Pop();
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2, val3))
+                {
+                    case (StringConstant val1String, IntegerConstant val2Int, StringConstant val3String):
+                        if (val2Int.Value < 0 || val2Int.Value + val3String.Value.Length > val1String.Value.Length)
+                            throw new Exception("Putinterval failed: source string too large for destination");
+                        opStack.Push(new StringConstant(val1String.Value.Substring(0, val2Int.Value) 
+                                                        + val3String.Value 
+                                                        + val1String.Value.Substring(val2Int.Value + val3String.Value.Length)));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        opStack.Push(val3);
+                        throw new Exception($"Unsupported types for putinterval operation: {val1.GetType()}, {val2.GetType()}, and {val3.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        #endregion
+
+        #region BOOLEAN_OPERATIONS
+
+        /// <summary>
+        /// Defines "eq" equal to operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void EqualToOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (StringConstant val1String, StringConstant val2String):
+                        opStack.Push(new BooleanConstant((val1String.Value == val2String.Value)));
+                        break;
+
+                    case (FloatConstant val1Float, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant(Math.Abs(val1Float.Value - val2Int.Value) < 0.0001f));
+                        break;
+
+                    case (IntegerConstant val1Int, FloatConstant val2Float):
+                        opStack.Push(new BooleanConstant(Math.Abs(val1Int.Value - val2Float.Value) < 0.0001f));
+                        break;
+
+                    case (IntegerConstant val1Int, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant((val1Int.Value == val2Int.Value)));
+                        break;
+
+                    case (BooleanConstant val1Bool, BooleanConstant val2Bool):
+                        opStack.Push(new BooleanConstant(val1Bool.Value == val2Bool.Value));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for equality comparison: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "ne" not equal to operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void NotEqualToOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (StringConstant val1String, StringConstant val2String):
+                        opStack.Push(new BooleanConstant((val1String.Value != val2String.Value)));
+                        break;
+
+                    case (FloatConstant val1Float, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant(Math.Abs(val1Float.Value - val2Int.Value) > 0.0001f));
+                        break;
+
+                    case (IntegerConstant val1Int, FloatConstant val2Float):
+                        opStack.Push(new BooleanConstant(Math.Abs(val1Int.Value - val2Float.Value) > 0.0001f));
+                        break;
+
+                    case (IntegerConstant val1Int, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant((val1Int.Value != val2Int.Value)));
+                        break;
+
+                    case (BooleanConstant val1Bool, BooleanConstant val2Bool):
+                        opStack.Push(new BooleanConstant(val1Bool.Value != val2Bool.Value));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for inequality comparison: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "gt" greater than operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void GreaterThanOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (FloatConstant val1Float, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant(val1Float.Value > val2Int.Value));
+                        break;
+
+                    case (IntegerConstant val1Int, FloatConstant val2Float):
+                        opStack.Push(new BooleanConstant(val1Int.Value > val2Float.Value));
+                        break;
+
+                    case (IntegerConstant val1Int, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant((val1Int.Value > val2Int.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for greater than comparison: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "lt" less than operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void LessThanOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (FloatConstant val1Float, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant(val1Float.Value < val2Int.Value));
+                        break;
+
+                    case (IntegerConstant val1Int, FloatConstant val2Float):
+                        opStack.Push(new BooleanConstant(val1Int.Value < val2Float.Value));
+                        break;
+
+                    case (IntegerConstant val1Int, IntegerConstant val2Int):
+                        opStack.Push(new BooleanConstant((val1Int.Value < val2Int.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for less than comparison: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "and" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void AndOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (BooleanConstant val1Bool, BooleanConstant val2Bool):
+                        opStack.Push(new BooleanConstant(val1Bool.Value && val2Bool.Value));
+                        break;
+
+                    case (IntegerConstant val1Int, IntegerConstant val2Int):
+                        opStack.Push(new IntegerConstant((val1Int.Value & val2Int.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for and comparison: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "or" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void OrOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (BooleanConstant val1Bool, BooleanConstant val2Bool):
+                        opStack.Push(new BooleanConstant(val1Bool.Value || val2Bool.Value));
+                        break;
+
+                    case (IntegerConstant val1Int, IntegerConstant val2Int):
+                        opStack.Push(new IntegerConstant((val1Int.Value | val2Int.Value)));
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for or comparison: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "not" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void NotOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (BooleanConstant valBool):
+                        opStack.Push(new BooleanConstant(!valBool.Value));
+                        break;
+
+                    case (IntegerConstant valInt):
+                        opStack.Push(new IntegerConstant(~valInt.Value));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception($"Unsupported type for not comparison: {val.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        #endregion
+
+        #region INPUT/OUTPUT_OPERATIONS
 
         /// <summary>
         /// Defines "=" pop and display operation.
@@ -556,7 +1174,9 @@ namespace PSInterpreter
                 else if (constant is IntegerConstant ic)
                     DisplayToConsole(ic.Value.ToString());
                 else if (constant is FloatConstant fc)
-                    DisplayToConsole(fc.Value.ToString());
+                    DisplayToConsole(fc.Value.ToString("0.0####"));
+                else if (constant is StringConstant sc)
+                    DisplayToConsole(sc.Value);
                 else
                     throw new Exception("Unable to display constant type");
             }
@@ -565,5 +1185,7 @@ namespace PSInterpreter
                 throw new Exception("Not enough constants in stack");
             }
         }
+
+        #endregion
     }
 }
