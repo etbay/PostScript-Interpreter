@@ -6,6 +6,7 @@ namespace PSInterpreter
     using System.Linq;
     using System.Linq.Expressions;
     using System.Net.NetworkInformation;
+    using System.Text;
     using Unity.VisualScripting;
     using UnityEngine;
     using UnityEngine.UIElements;
@@ -23,11 +24,14 @@ namespace PSInterpreter
 
         private static List<Parser> parsers = new List<Parser>();
 
+        private static bool hasQuit = false;
+
         static Interpreter()
         {
             parsers.Add(ProcessNumeric);
             parsers.Add(ProcessBoolean);
             parsers.Add(ProcessString);
+            parsers.Add(ProcessCodeBlock);
             InitializeDict();
         }
 
@@ -73,6 +77,12 @@ namespace PSInterpreter
             dictStack[0]["or"] = new OperationConstant(OrOperation);
             dictStack[0]["not"] = new OperationConstant(NotOperation);
 
+            dictStack[0]["if"] = new OperationConstant(IfOperation);
+            dictStack[0]["ifelse"] = new OperationConstant(IfElseOperation);
+            dictStack[0]["for"] = new OperationConstant(ForOperation);
+            dictStack[0]["repeat"] = new OperationConstant(RepeatOperation);
+            dictStack[0]["quit"] = new OperationConstant(QuitOperation);
+
             dictStack[0]["print"] = new OperationConstant(PopAndDisplayOperation);
             dictStack[0]["="] = new OperationConstant(PopAndDisplayOperation);
             dictStack[0]["=="] = new OperationConstant(PopAndDisplayOperation);
@@ -101,23 +111,84 @@ namespace PSInterpreter
         /// <param name="input">String to process.</param>
         public static void ProcessInput(string input)
         {
-            try
+            if (hasQuit)
+                return;
+
+            List<string> inputs = SplitString(input);
+
+            foreach (string i in inputs)
             {
-                Debug.Log($"Processing '{input}'");
-                ProcessConstants(input);
-            }
-            catch
-            {
-                Debug.Log($"Could not process '{input}' as a constant");
+                Debug.Log($"Processing '{i}'");
                 try
                 {
-                    LookupInDict(input);
+                    ProcessConstants(i);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    DisplayToConsole?.Invoke(ex.Message);
+                    Debug.Log($"Could not process '{i}' as a constant");
+                    try
+                    {
+                        LookupInDict(i);
+                    }
+                    catch (Exception ex)
+                    {
+                        DisplayToConsole?.Invoke(ex.Message);
+                    }
+                }
+                if (hasQuit)
+                    return;
+            }
+        }
+
+        /// <summary>
+        /// Splits string into tokens while recognizing code blocks.
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        private static List<string> SplitString(string input)
+        {
+            List<string> splitInput = input.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            List<string> newInput = new List<string>();
+            StringBuilder codeBlock = new StringBuilder();
+            bool inCodeBlock = false;
+
+            foreach (string i in splitInput)
+            {
+                Debug.Log($"Processing {i}");
+                if (i.StartsWith("{"))
+                {
+                    inCodeBlock = true;
+                    codeBlock.Append(i + " ");
+                }
+                else if (i.EndsWith("}"))
+                {
+                    inCodeBlock = false;
+                    codeBlock.Append(i);
+                    newInput.Add(codeBlock.ToString());
+                    codeBlock.Clear();
+                }
+                else if (inCodeBlock)
+                {
+                    codeBlock.Append(i + " ");
+                }
+                else
+                {
+                    newInput.Add(i);
                 }
             }
+
+            if (inCodeBlock)
+            {
+                codeBlock.Append('}');
+                newInput.Add(codeBlock.ToString() + " ");
+            }
+
+            foreach (string i in newInput)
+            {
+                Debug.Log(i);
+            }
+
+            return newInput;
         }
 
         /// <summary>
@@ -151,7 +222,6 @@ namespace PSInterpreter
             {
                 foreach (KeyValuePair<string, Constant> variable in dict)
                 {
-                    Debug.Log($"Key: {variable.Key}, Value: {variable.Value}");
                     if (input == variable.Key && variable.Value is OperationConstant)
                     {
                         Debug.Log($"Found '{input}' in dictStack. Executing");
@@ -175,7 +245,6 @@ namespace PSInterpreter
         private static Constant ProcessNumeric(string input)
         {
             Debug.Log($"Attempting to parse '{input}' into numeric");
-
             if (float.TryParse(input, out float floatResult) || int.TryParse(input, out int intResult))
             {
 
@@ -196,7 +265,6 @@ namespace PSInterpreter
         private static Constant ProcessBoolean(string input)
         {
             Debug.Log($"Attempting to parse '{input}' into boolean");
-
             if (input == "true")
             {
                 Debug.Log($"Parsed '{input}' into boolean");
@@ -212,12 +280,24 @@ namespace PSInterpreter
 
         private static Constant ProcessString(string input)
         {
+            Debug.Log($"Attempting to parse '{input}' into string");
             if (input.StartsWith('(') && input.EndsWith(')'))
             {
-                string inputString = input.Substring(1, input.Length - 2);
-                return new StringConstant(inputString);
+                Debug.Log($"Parsed '{input}' into string");
+                return new StringConstant(input.Substring(1, input.Length - 2));
             }
             throw new Exception("Could not parse " + input + " into string");
+        }
+
+        private static Constant ProcessCodeBlock(string input)
+        {
+            Debug.Log($"Attempting to parse '{input}' into code block");
+            if (input.StartsWith('{') && input.EndsWith('}'))
+            {
+                Debug.Log($"Parsed '{input}' into code block");
+                return new CodeBlockConstant(input.Substring(1, input.Length - 2).Trim());
+            }
+            throw new Exception("Could not parse " + input + " into code block");
         }
 
         #endregion
@@ -1157,6 +1237,150 @@ namespace PSInterpreter
 
         #endregion
 
+        #region FLOW_CONTROL_OPERATIONS
+
+        /// <summary>
+        /// Defines "if" conditional operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void IfOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (BooleanConstant val1Bool, CodeBlockConstant val2CodeBlock):
+                        if (val1Bool.Value)
+                            ProcessInput(val2CodeBlock.Value);
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for if conditional: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "ifelse" conditional operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void IfElseOperation()
+        {
+            if (StackCount() >= 3)
+            {
+                Constant val3 = opStack.Pop();
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2, val3))
+                {
+                    case (BooleanConstant val1Bool, CodeBlockConstant val2CodeBlock, CodeBlockConstant val3CodeBlock):
+                        if (val1Bool.Value)
+                            ProcessInput(val2CodeBlock.Value);
+                        else
+                            ProcessInput(val3CodeBlock.Value);
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        opStack.Push(val3);
+                        throw new Exception($"Unsupported types for if else conditional: {val1.GetType()}, {val2.GetType()}, and {val3.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "for" loop operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void ForOperation()
+        {
+            if (StackCount() >= 4)
+            {
+                Constant val4 = opStack.Pop();
+                Constant val3 = opStack.Pop();
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2, val3, val4))
+                {
+                    case (IntegerConstant val1Int, IntegerConstant val2Int, IntegerConstant val3Int, CodeBlockConstant val4CodeBlock):
+                        for (int i = val1Int.Value; i <= val2Int.Value; i += val3Int.Value)
+                        {
+                            ProcessInput(val4CodeBlock.Value);
+                        }
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        opStack.Push(val3);
+                        opStack.Push(val4);
+                        throw new Exception($"Unsupported types for for loop: {val1.GetType()}, {val2.GetType()}, {val3.GetType()}, and {val4.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "repeat" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void RepeatOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (IntegerConstant val1Bool, CodeBlockConstant val2CodeBlock):
+                        for (int i = 0; i < val1Bool.Value; i++)
+                        {
+                            ProcessInput(val2CodeBlock.Value);
+                        }
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for repeat operation: {val1.GetType()} and {val2.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "quit" operation.
+        /// </summary>
+        private static void QuitOperation()
+        {
+            hasQuit = true;
+        }
+
+        #endregion
+
         #region INPUT/OUTPUT_OPERATIONS
 
         /// <summary>
@@ -1177,6 +1401,8 @@ namespace PSInterpreter
                     DisplayToConsole(fc.Value.ToString("0.0####"));
                 else if (constant is StringConstant sc)
                     DisplayToConsole(sc.Value);
+                else if (constant is CodeBlockConstant cbc)
+                    DisplayToConsole(cbc.Value);
                 else
                     throw new Exception("Unable to display constant type");
             }

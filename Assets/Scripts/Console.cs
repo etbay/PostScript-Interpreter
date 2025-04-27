@@ -73,9 +73,7 @@ public class Console : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(input))
         {
-            List<string> inputs = input.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-            foreach (string i in inputs)
-                Interpreter.ProcessInput(i);
+            Interpreter.ProcessInput(input);
         }
 
         StartCoroutine(WaitAndPrompt());
