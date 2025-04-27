@@ -1,6 +1,5 @@
 namespace PSInterpreter
 {
-    using GluonGui.WorkspaceWindow.Views.WorkspaceExplorer.Explorer;
     using PSInterpreter.Constants;
     using System;
     using System.Collections.Generic;
@@ -25,7 +24,7 @@ namespace PSInterpreter
 
         private static List<Parser> parsers = new List<Parser>();
 
-        private static bool hasQuit = false;
+        private static bool dynamicScoping = true;
 
         static Interpreter()
         {
@@ -46,6 +45,8 @@ namespace PSInterpreter
             dictStack.Add(new Dictionary<string, Constant>());
 
             // initializes the system dictionary with operators
+            dictStack[0]["changescoping"] = new OperationConstant(ChangeScopingOperation);
+
             dictStack[0]["exch"] = new OperationConstant(ExchangeOperation);
             dictStack[0]["pop"] = new OperationConstant(PopOperation);
             dictStack[0]["copy"] = new OperationConstant(CopyOperation);
@@ -150,6 +151,42 @@ namespace PSInterpreter
         }
 
         /// <summary>
+        /// Processes input for lexical scoping.
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="dict"></param>
+        public static void ProcessInput(string input, Dictionary<string, Constant> dict)
+        {
+            if (hasQuit)
+                return;
+
+            List<string> inputs = SplitString(input);
+
+            foreach (string i in inputs)
+            {
+                Debug.Log($"Processing '{i}'");
+                try
+                {
+                    ProcessConstants(i);
+                }
+                catch
+                {
+                    Debug.Log($"Could not process '{i}' as a constant");
+                    try
+                    {
+                        LookupInDict(i, dict);
+                    }
+                    catch (Exception ex)
+                    {
+                        DisplayToConsole?.Invoke(ex.Message);
+                    }
+                }
+                if (hasQuit)
+                    return;
+            }
+        }
+
+        /// <summary>
         /// Splits string into tokens while recognizing code blocks.
         /// </summary>
         /// <param name="input"></param>
@@ -159,26 +196,56 @@ namespace PSInterpreter
             List<string> splitInput = input.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
             List<string> newInput = new List<string>();
             StringBuilder codeBlock = new StringBuilder();
+            StringBuilder str = new StringBuilder();
             bool inCodeBlock = false;
+            bool inString = false;
+            int numBraceOpen = 0;
 
             foreach (string i in splitInput)
             {
-                Debug.Log($"Processing {i}");
-                if (i.StartsWith("{"))
+                Debug.Log($"Processing split {i}");
+                if (i.StartsWith("{") && !inString)
                 {
+                    numBraceOpen++;
                     inCodeBlock = true;
                     codeBlock.Append(i + " ");
                 }
-                else if (i.EndsWith("}"))
+                else if (i.EndsWith("}") && !inString)
                 {
-                    inCodeBlock = false;
-                    codeBlock.Append(i);
-                    newInput.Add(codeBlock.ToString());
-                    codeBlock.Clear();
+                    numBraceOpen--;
+                    if (numBraceOpen == 0)
+                    {
+                        inCodeBlock = false;
+                        codeBlock.Append(i);
+                        newInput.Add(codeBlock.ToString());
+                        codeBlock.Clear();
+                    }
+                    else
+                    {
+                        codeBlock.Append(i + " ");
+                    }
                 }
-                else if (inCodeBlock)
+                else if (inCodeBlock && !inString)
                 {
                     codeBlock.Append(i + " ");
+                }
+                else if (i.StartsWith("(") && !i.EndsWith(")"))
+                {
+                    Debug.Log("Started string");
+                    inString = true;
+                    str.Append(i + " ");
+                }
+                else if (i.EndsWith(")") && !i.StartsWith("("))
+                {
+                    Debug.Log("Ended string");
+                    inString = false;
+                    str.Append(i);
+                    newInput.Add(str.ToString());
+                    str.Clear();
+                }
+                else if (inString && !inCodeBlock)
+                {
+                    str.Append(i + " ");
                 }
                 else
                 {
@@ -191,10 +258,15 @@ namespace PSInterpreter
                 codeBlock.Append('}');
                 newInput.Add(codeBlock.ToString() + " ");
             }
+            else if (inString)
+            {
+                str.Append(')');
+                newInput.Add(str.ToString() + " ");
+            }
 
             foreach (string i in newInput)
             {
-                Debug.Log(i);
+                Debug.Log("New input " + i);
             }
 
             return newInput;
@@ -234,13 +306,27 @@ namespace PSInterpreter
                 {
                     if (input == variable.Key)
                     {
-                        if (variable.Value is OperationConstant)
+                        if (variable.Value is OperationConstant op)
                         {
                             Debug.Log($"Found '{input}' in dictStack. Executing");
-                            OperationConstant op = (OperationConstant)variable.Value;
                             op.Value();
                             dictStack.Reverse();
                             return;
+                        }
+                        else if (variable.Value is CodeBlockConstant cbc)
+                        {
+                            if (dynamicScoping)
+                            {
+                                ProcessInput(cbc.Value);
+                                dictStack.Reverse();
+                                return;
+                            }
+                            else
+                            {
+                                ProcessInput(cbc.Value, dict);
+                                dictStack.Reverse();
+                                return;
+                            }
                         }
                         else
                         {
@@ -253,6 +339,58 @@ namespace PSInterpreter
             }
             dictStack.Reverse();
             throw new Exception($"Operation '{input}' not found");
+        }
+
+        private static void LookupInDict(string input, Dictionary<string, Constant> dict)
+        {
+            Debug.Log($"Looking up '{input}' in dictStack({dictStack.Count})");
+            dictStack.Reverse();
+            foreach (KeyValuePair<string, Constant> variable in dict)
+            {
+                if (input == variable.Key)
+                {
+                    if (variable.Value is OperationConstant op)
+                    {
+                        Debug.Log($"Found '{input}' in dictStack. Executing");
+                        op.Value();
+                        dictStack.Reverse();
+                        return;
+                    }
+                    else if (variable.Value is CodeBlockConstant cbc)
+                    {
+                        if (dynamicScoping)
+                        {
+                            ProcessInput(cbc.Value);
+                            dictStack.Reverse();
+                            return;
+                        }
+                        else
+                        {
+                            ProcessInput(cbc.Value, dict);
+                            dictStack.Reverse();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        opStack.Push(variable.Value);
+                        dictStack.Reverse();
+                        return;
+                    }
+                }
+            }
+            dictStack.Reverse();
+            throw new Exception($"Operation '{input}' not found");
+        }
+
+        /// <summary>
+        /// Defines "changescoping" operation.
+        /// Changes from dynamic to lexical and lexical to dynamic scoping.
+        /// </summary>
+        private static void ChangeScopingOperation()
+        {
+            dynamicScoping = !dynamicScoping;
+            Debug.Log("Dynamic scoping is: " + dynamicScoping.ToString());
         }
 
         #region PARSERS
@@ -1556,7 +1694,7 @@ namespace PSInterpreter
         /// </summary>
         private static void QuitOperation()
         {
-            hasQuit = true;
+            Application.Quit();
         }
 
         #endregion
