@@ -1,5 +1,6 @@
 namespace PSInterpreter
 {
+    using GluonGui.WorkspaceWindow.Views.WorkspaceExplorer.Explorer;
     using PSInterpreter.Constants;
     using System;
     using System.Collections.Generic;
@@ -32,6 +33,7 @@ namespace PSInterpreter
             parsers.Add(ProcessBoolean);
             parsers.Add(ProcessString);
             parsers.Add(ProcessCodeBlock);
+            parsers.Add(ProcessVariable);
             InitializeDict();
         }
 
@@ -63,6 +65,8 @@ namespace PSInterpreter
             dictStack[0]["floor"] = new OperationConstant(FloorOperation);
             dictStack[0]["round"] = new OperationConstant(RoundOperation);
             dictStack[0]["sqrt"] = new OperationConstant(SquareRootOperation);
+
+            dictStack[0]["def"] = new OperationConstant(DefinitionOperation);
 
             dictStack[0]["length"] = new OperationConstant(LengthOperation);
             dictStack[0]["get"] = new OperationConstant(GetOperation);
@@ -218,20 +222,30 @@ namespace PSInterpreter
         private static void LookupInDict(string input)
         {
             Debug.Log($"Looking up '{input}' in dictStack({dictStack.Count})");
+            dictStack.Reverse();
             foreach (Dictionary<string, Constant> dict in dictStack)
             {
                 foreach (KeyValuePair<string, Constant> variable in dict)
                 {
-                    if (input == variable.Key && variable.Value is OperationConstant)
+                    if (input == variable.Key)
                     {
-                        Debug.Log($"Found '{input}' in dictStack. Executing");
-                        OperationConstant op = (OperationConstant) variable.Value;
-                        op.Value();
-                        return;
+                        if (variable.Value is OperationConstant)
+                        {
+                            Debug.Log($"Found '{input}' in dictStack. Executing");
+                            OperationConstant op = (OperationConstant)variable.Value;
+                            op.Value();
+                            return;
+                        }
+                        else
+                        {
+                            opStack.Push(variable.Value);
+                            return;
+                        }
                     }
                 }
-                throw new Exception($"Operation '{input}' not found");
             }
+            dictStack.Reverse();
+            throw new Exception($"Operation '{input}' not found");
         }
 
         #region PARSERS
@@ -298,6 +312,17 @@ namespace PSInterpreter
                 return new CodeBlockConstant(input.Substring(1, input.Length - 2).Trim());
             }
             throw new Exception("Could not parse " + input + " into code block");
+        }
+
+        private static Constant ProcessVariable(string input)
+        {
+            Debug.Log($"Attempting to parse '{input}' into variable");
+            if (input.StartsWith('/'))
+            {
+                Debug.Log($"Parsed '{input}' into variable");
+                return new VariableConstant(input.Substring(1));
+            }
+            throw new Exception("Could not parse " + input + " into variable");
         }
 
         #endregion
@@ -836,6 +861,76 @@ namespace PSInterpreter
                     default:
                         opStack.Push(val);
                         throw new Exception("Type is not supported in square root operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        #endregion
+
+        #region DICTIONARY_OPERATIONS
+
+        private static void DictionaryOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (IntegerConstant valInt):
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in dict operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "def" definition operation.
+        /// </summary>
+        private static void DefinitionOperation()
+        {
+            if (StackCount() >= 2)
+            {
+                Constant val2 = opStack.Pop();
+                Constant val1 = opStack.Pop();
+
+                switch ((val1, val2))
+                {
+                    case (VariableConstant val1Variable, BooleanConstant val2Bool):
+                        dictStack[dictStack.Count - 1][val1Variable.Value] = val2Bool;
+                        break;
+
+                    case (VariableConstant val1Variable, CodeBlockConstant val2CodeBlock):
+                        dictStack[dictStack.Count - 1][val1Variable.Value] = val2CodeBlock;
+                        break;
+
+                    case (VariableConstant val1Variable, FloatConstant val2Float):
+                        dictStack[dictStack.Count - 1][val1Variable.Value] = val2Float;
+                        break;
+
+                    case (VariableConstant val1Variable, IntegerConstant val2Int):
+                        dictStack[dictStack.Count - 1][val1Variable.Value] = val2Int;
+                        break;
+
+                    case (VariableConstant val1Variable, StringConstant val2String):
+                        dictStack[dictStack.Count - 1][val1Variable.Value] = val2String;
+                        break;
+
+                    default:
+                        opStack.Push(val1);
+                        opStack.Push(val2);
+                        throw new Exception($"Unsupported types for equality comparison: {val1.GetType()} and {val2.GetType()}");
                 }
             }
             else
@@ -1403,6 +1498,8 @@ namespace PSInterpreter
                     DisplayToConsole(sc.Value);
                 else if (constant is CodeBlockConstant cbc)
                     DisplayToConsole(cbc.Value);
+                else if (constant is VariableConstant vc)
+                    DisplayToConsole(vc.Value);
                 else
                     throw new Exception("Unable to display constant type");
             }

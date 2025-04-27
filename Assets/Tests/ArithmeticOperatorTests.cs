@@ -67,9 +67,9 @@ public class ArithmeticOperatorTests
         Interpreter.ProcessInput("2.5");
         Interpreter.ProcessInput("2.5");
         Interpreter.ProcessInput("add");
-        Assert.That(Interpreter.PeekStack(), Is.TypeOf<IntegerConstant>());
-        IntegerConstant fc = (IntegerConstant)Interpreter.PeekStack();
-        Assert.That(fc.Value, Is.EqualTo(5));
+        Assert.That(Interpreter.PeekStack(), Is.TypeOf<FloatConstant>());
+        FloatConstant fc = (FloatConstant)Interpreter.PeekStack();
+        Assert.That(fc.Value, Is.EqualTo(5.0f));
     }
 
     #endregion
@@ -126,9 +126,9 @@ public class ArithmeticOperatorTests
         Interpreter.ProcessInput("2.5");
         Interpreter.ProcessInput("1.5");
         Interpreter.ProcessInput("sub");
-        Assert.That(Interpreter.PeekStack(), Is.TypeOf<IntegerConstant>());
-        IntegerConstant fc = (IntegerConstant)Interpreter.PeekStack();
-        Assert.That(fc.Value, Is.EqualTo(1));
+        Assert.That(Interpreter.PeekStack(), Is.TypeOf<FloatConstant>());
+        FloatConstant fc = (FloatConstant)Interpreter.PeekStack();
+        Assert.That(fc.Value, Is.EqualTo(1.0f));
     }
 
     #endregion
@@ -163,9 +163,9 @@ public class ArithmeticOperatorTests
         Interpreter.ProcessInput("2.5");
         Interpreter.ProcessInput("2");
         Interpreter.ProcessInput("mul");
-        Assert.That(Interpreter.PeekStack(), Is.TypeOf<IntegerConstant>());
-        IntegerConstant fc = (IntegerConstant)Interpreter.PeekStack();
-        Assert.That(fc.Value, Is.EqualTo(5));
+        Assert.That(Interpreter.PeekStack(), Is.TypeOf<FloatConstant>());
+        FloatConstant fc = (FloatConstant)Interpreter.PeekStack();
+        Assert.That(fc.Value, Is.EqualTo(5.0f));
     }
 
     [Test]
@@ -185,9 +185,9 @@ public class ArithmeticOperatorTests
         Interpreter.ProcessInput("2.5");
         Interpreter.ProcessInput("5.6");
         Interpreter.ProcessInput("mul");
-        Assert.That(Interpreter.PeekStack(), Is.TypeOf<IntegerConstant>());
-        IntegerConstant fc = (IntegerConstant)Interpreter.PeekStack();
-        Assert.That(fc.Value, Is.EqualTo(14));
+        Assert.That(Interpreter.PeekStack(), Is.TypeOf<FloatConstant>());
+        FloatConstant fc = (FloatConstant)Interpreter.PeekStack();
+        Assert.That(fc.Value, Is.EqualTo(14.0f));
     }
 
     #endregion
@@ -200,9 +200,9 @@ public class ArithmeticOperatorTests
         Interpreter.ProcessInput("8");
         Interpreter.ProcessInput("4");
         Interpreter.ProcessInput("div");
-        Assert.That(Interpreter.PeekStack(), Is.TypeOf<IntegerConstant>());
-        IntegerConstant fc = (IntegerConstant)Interpreter.PeekStack();
-        Assert.That(fc.Value, Is.EqualTo(2));
+        Assert.That(Interpreter.PeekStack(), Is.TypeOf<FloatConstant>());
+        FloatConstant fc = (FloatConstant)Interpreter.PeekStack();
+        Assert.That(fc.Value, Is.EqualTo(2.0f));
     }
 
     [Test]
@@ -244,9 +244,9 @@ public class ArithmeticOperatorTests
         Interpreter.ProcessInput("5.5");
         Interpreter.ProcessInput("0.5");
         Interpreter.ProcessInput("div");
-        Assert.That(Interpreter.PeekStack(), Is.TypeOf<IntegerConstant>());
-        IntegerConstant fc = (IntegerConstant)Interpreter.PeekStack();
-        Assert.That(fc.Value, Is.EqualTo(11));
+        Assert.That(Interpreter.PeekStack(), Is.TypeOf<FloatConstant>());
+        FloatConstant fc = (FloatConstant)Interpreter.PeekStack();
+        Assert.That(fc.Value, Is.EqualTo(11.0f));
     }
 
     [Test]
