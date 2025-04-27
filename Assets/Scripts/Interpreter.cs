@@ -66,6 +66,11 @@ namespace PSInterpreter
             dictStack[0]["round"] = new OperationConstant(RoundOperation);
             dictStack[0]["sqrt"] = new OperationConstant(SquareRootOperation);
 
+            dictStack[0]["dict"] = new OperationConstant(DictionaryOperation);
+            dictStack[0]["length"] = new OperationConstant(LengthOperation);
+            dictStack[0]["maxlength"] = new OperationConstant(MaxLengthOperation);
+            dictStack[0]["begin"] = new OperationConstant(BeginOperation);
+            dictStack[0]["end"] = new OperationConstant(EndOperation);
             dictStack[0]["def"] = new OperationConstant(DefinitionOperation);
 
             dictStack[0]["length"] = new OperationConstant(LengthOperation);
@@ -234,11 +239,13 @@ namespace PSInterpreter
                             Debug.Log($"Found '{input}' in dictStack. Executing");
                             OperationConstant op = (OperationConstant)variable.Value;
                             op.Value();
+                            dictStack.Reverse();
                             return;
                         }
                         else
                         {
                             opStack.Push(variable.Value);
+                            dictStack.Reverse();
                             return;
                         }
                     }
@@ -873,6 +880,10 @@ namespace PSInterpreter
 
         #region DICTIONARY_OPERATIONS
 
+        /// <summary>
+        /// Defines "dict" operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         private static void DictionaryOperation()
         {
             if (StackCount() >= 1)
@@ -882,6 +893,7 @@ namespace PSInterpreter
                 switch (val)
                 {
                     case (IntegerConstant valInt):
+                        opStack.Push(new DictionaryConstant(valInt.Value));
                         break;
 
                     default:
@@ -892,6 +904,102 @@ namespace PSInterpreter
             else
             {
                 throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "length" string operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void LengthOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (StringConstant valString):
+                        opStack.Push(new IntegerConstant(valString.Value.Length));
+                        break;
+
+                    case (DictionaryConstant valDict):
+                        opStack.Push(new IntegerConstant(valDict.Value.Count));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception($"Unsupported type for length operation: {val.GetType()}");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "maxlength" dictionary operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void MaxLengthOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (DictionaryConstant valDict):
+                        opStack.Push(new IntegerConstant(valDict.MaxSize));
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in begin operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "begin" dictionary operation.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static void BeginOperation()
+        {
+            if (StackCount() >= 1)
+            {
+                Constant val = opStack.Pop();
+
+                switch (val)
+                {
+                    case (DictionaryConstant valDict):
+                        dictStack.Add(valDict.Value);
+                        break;
+
+                    default:
+                        opStack.Push(val);
+                        throw new Exception("Type is not supported in begin operation");
+                }
+            }
+            else
+            {
+                throw new Exception("Not enough constants in stack");
+            }
+        }
+
+        /// <summary>
+        /// Defines "end" dictionary operation.
+        /// </summary>
+        private static void EndOperation()
+        {
+            if (dictStack.Count >= 2)
+            {
+                dictStack.Remove(dictStack[dictStack.Count - 1]);
             }
         }
 
@@ -927,10 +1035,14 @@ namespace PSInterpreter
                         dictStack[dictStack.Count - 1][val1Variable.Value] = val2String;
                         break;
 
+                    case (VariableConstant val1Variable, DictionaryConstant val2Dictionary):
+                        dictStack[dictStack.Count - 1][val1Variable.Value] = val2Dictionary;
+                        break;
+
                     default:
                         opStack.Push(val1);
                         opStack.Push(val2);
-                        throw new Exception($"Unsupported types for equality comparison: {val1.GetType()} and {val2.GetType()}");
+                        throw new Exception($"Unsupported types for definition operation: {val1.GetType()} and {val2.GetType()}");
                 }
             }
             else
@@ -942,33 +1054,6 @@ namespace PSInterpreter
         #endregion
 
         #region STRING_OPERATIONS
-
-        /// <summary>
-        /// Defines "length" string operation.
-        /// </summary>
-        /// <exception cref="Exception"></exception>
-        private static void LengthOperation()
-        {
-            if (StackCount() >= 1)
-            {
-                Constant val = opStack.Pop();
-
-                switch (val)
-                {
-                    case (StringConstant valString):
-                        opStack.Push(new IntegerConstant(valString.Value.Length));
-                        break;
-
-                    default:
-                        opStack.Push(val);
-                        throw new Exception($"Unsupported type for length operation: {val.GetType()}");
-                }
-            }
-            else
-            {
-                throw new Exception("Not enough constants in stack");
-            }
-        }
 
         /// <summary>
         /// Defines "get" string operation.
@@ -1500,6 +1585,8 @@ namespace PSInterpreter
                     DisplayToConsole(cbc.Value);
                 else if (constant is VariableConstant vc)
                     DisplayToConsole(vc.Value);
+                else if (constant is DictionaryConstant dc)
+                    DisplayToConsole(dc.Value.ToString());
                 else
                     throw new Exception("Unable to display constant type");
             }
