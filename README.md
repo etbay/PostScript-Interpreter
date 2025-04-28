@@ -1,4 +1,6 @@
 # PostScript Interpreter
+## Switching Scoping
+To switch from dynamic scoping to lexical scoping and vice a versa, simply enter "changescoping"
 ## Downloading and Running
 Since this intepreter was made in Unity, there are two options for downloading and running. You can download via the executable or via the code and using the Unity Engine.
 ### Executable
